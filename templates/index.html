@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raphael - AI Soil Nutrient Diagnostic System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-row">
+        <span class="brand-icon">🌱</span>
+        <div>
+          <h1 class="app-title">Raphael</h1>
+          <p class="app-subtitle">AI Soil Nutrient Diagnostic System</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Grid -->
+    <div class="dashboard-grid">
+      <!-- Sidebar / Info Panel -->
+      <aside class="sidebar-panel">
+        <!-- About Raphael Card -->
+        <div class="info-card">
+          <h2 class="card-title">📖 About Raphael</h2>
+          <p class="info-text">
+            <strong>Raphael</strong> is an AI soil diagnostic system utilizing a <strong>Multi-Head Neural Network (mhNN)</strong> to classify macronutrients into <code>DEFICIENT</code>, <code>SUFFICIENT</code>, or <code>HIGH</code>.
+          </p>
+        </div>
+
+        <!-- Model Learned Thresholds Card -->
+        <div class="info-card">
+          <h2 class="card-title">🎯 Model Learned Thresholds</h2>
+          <p class="info-text" style="margin-bottom: 0.4rem;">
+            Trained on European topsoil benchmark data:
+          </p>
+          <table class="threshold-table">
+            <thead>
+              <tr>
+                <th>Nutrient</th>
+                <th>Deficient</th>
+                <th>Sufficient</th>
+                <th>High</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>N</strong> (g/kg)</td>
+                <td>&lt; 1.93</td>
+                <td>1.93 – 3.02</td>
+                <td>&gt; 3.02</td>
+              </tr>
+              <tr>
+                <td><strong>P</strong> (mg/kg)</td>
+                <td>&lt; 14.8</td>
+                <td>14.8 – 29.7</td>
+                <td>&gt; 29.7</td>
+              </tr>
+              <tr>
+                <td><strong>K</strong> (mg/kg)</td>
+                <td>&lt; 99.7</td>
+                <td>99.7 – 198.6</td>
+                <td>&gt; 198.6</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Chemical Constraint Layer Card -->
+        <div class="info-card">
+          <h2 class="card-title">🧪 Chemical Constraint Layer (CCL)</h2>
+          <p class="info-text">
+            Rule-based constraint layer evaluating <strong>pH-related availability restrictions</strong> independently from neural network predictions:
+          </p>
+          <ul class="info-text" style="margin: 0.4rem 0 0 1.25rem;">
+            <li><strong>Nitrogen</strong>: restricted if pH &lt; 6.0 or pH &gt; 8.0</li>
+            <li><strong>Phosphorus</strong>: restricted if pH &lt; 6.0 or pH &gt; 7.5</li>
+            <li><strong>Potassium</strong>: restricted if pH &lt; 6.0 or pH &gt; 9.0</li>
+          </ul>
+        </div>
+
+        <!-- Quick Presets -->
+        <div class="info-card">
+          <h2 class="card-title">⚡ Quick Presets</h2>
+          <p class="info-text">Click a profile to load benchmark values:</p>
+          <div class="preset-group">
+            <button type="button" class="preset-btn" onclick="applyPreset(2.5, 22.0, 150.0, 6.5, this)">
+              🌿 Balanced & Sufficient Soil (pH 6.5)
+            </button>
+            <button type="button" class="preset-btn" onclick="applyPreset(1.0, 8.0, 50.0, 6.5, this)">
+              🍂 Deficient Nutrient Soil (pH 6.5)
+            </button>
+            <button type="button" class="preset-btn" onclick="applyPreset(4.0, 45.0, 260.0, 6.5, this)">
+              🌾 High / Excess Nutrient Soil (pH 6.5)
+            </button>
+            <button type="button" class="preset-btn" onclick="applyPreset(2.5, 22.0, 150.0, 5.2, this)">
+              🍋 Acidic Soil with Restriction (pH 5.2)
+            </button>
+            <button type="button" class="preset-btn" onclick="applyPreset(2.5, 22.0, 150.0, 8.4, this)">
+              🏔️ Alkaline Calcareous Soil (pH 8.4)
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="main-content">
+        <!-- Reference Banner -->
+        <div class="reference-banner">
+          <span>💡</span>
+          <div>
+            <strong>Input Calibration Notice:</strong> Values are calibrated to laboratory topsoil units. Total Nitrogen (N) is entered in <strong>g/kg</strong>; Available Phosphorus (P) and Potassium (K) are entered in <strong>mg/kg</strong>. Soil pH is measured in water solution (0.0 to 14.0).
+          </div>
+        </div>
+
+        <!-- Error Alert if Any -->
+        {% if errors %}
+        <div class="error-box">
+          <strong>Validation Errors:</strong>
+          <ul style="margin: 0.3rem 0 0 1.25rem;">
+            {% for err in errors %}
+            <li>{{ err }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        <!-- Soil Input Form -->
+        <section class="form-card">
+          <h2 class="section-heading">1. Enter Soil Sample Measurements</h2>
+          <form action="{{ url_for('analyze') }}" method="POST" id="soilForm">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="input_n" class="form-label">
+                  Nitrogen (N) <span class="unit-tag">[Total N, g/kg]</span>
+                </label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  min="0" 
+                  max="1000" 
+                  id="input_n" 
+                  name="n" 
+                  class="form-input" 
+                  value="{{ inputs.n if inputs else '2.50' }}" 
+                  required
+                >
+                <span class="form-hint">Deficient: &lt;1.93 | Sufficient: 1.93–3.02 | High: &gt;3.02</span>
+              </div>
+
+              <div class="form-group">
+                <label for="input_p" class="form-label">
+                  Phosphorus (P) <span class="unit-tag">[Available P, mg/kg]</span>
+                </label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  min="0" 
+                  max="2000" 
+                  id="input_p" 
+                  name="p" 
+                  class="form-input" 
+                  value="{{ inputs.p if inputs else '22.00' }}" 
+                  required
+                >
+                <span class="form-hint">Deficient: &lt;14.8 | Sufficient: 14.8–29.7 | High: &gt;29.7</span>
+              </div>
+
+              <div class="form-group">
+                <label for="input_k" class="form-label">
+                  Potassium (K) <span class="unit-tag">[Extractable K, mg/kg]</span>
+                </label>
+                <input 
+                  type="number" 
+                  step="1.0" 
+                  min="0" 
+                  max="10000" 
+                  id="input_k" 
+                  name="k" 
+                  class="form-input" 
+                  value="{{ inputs.k if inputs else '150.00' }}" 
+                  required
+                >
+                <span class="form-hint">Deficient: &lt;99.7 | Sufficient: 99.7–198.6 | High: &gt;198.6</span>
+              </div>
+
+              <div class="form-group">
+                <label for="input_ph" class="form-label">
+                  Soil pH (H2O) <span class="unit-tag">[0.0 – 14.0]</span>
+                </label>
+                <input 
+                  type="number" 
+                  step="0.1" 
+                  min="0" 
+                  max="14" 
+                  id="input_ph" 
+                  name="ph" 
+                  class="form-input" 
+                  value="{{ inputs.ph if inputs else '6.50' }}" 
+                  required
+                >
+                <span class="form-hint">Optimal bioavailability window: 6.0 – 7.5</span>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-primary" id="analyzeBtn">
+              🔍 Analyze Soil
+            </button>
+          </form>
+        </section>
+
+        <!-- Diagnostic Results Section (Rendered on Submission) -->
+        {% if results %}
+        <section class="results-card" id="resultsSection">
+          <h2 class="section-heading">2. Diagnostic Results</h2>
+
+          <!-- 3 Nutrient Cards -->
+          <div class="nutrient-cards-grid">
+            {% for nutrient, data in results.items() %}
+            <div class="nutrient-card">
+              <div class="nutrient-title">{{ nutrient }}</div>
+              <span class="status-badge badge-{{ data.status }}">{{ data.status }}</span>
+              <div class="confidence-row">
+                Confidence: <span class="confidence-val">{{ "%.1f"|format(data.confidence) }}%</span>
+              </div>
+
+              <div class="nutrient-ccl-flag">
+                pH-related availability restriction: 
+                {% if ccl.restrictions[nutrient] %}
+                <span class="ccl-tag-yes">YES</span>
+                {% else %}
+                <span class="ccl-tag-no">NO</span>
+                {% endif %}
+              </div>
+
+              <!-- Probability Distribution -->
+              <div class="prob-section">
+                <span class="prob-toggle" onclick="toggleProb('{{ nutrient }}')">▼ Probability Breakdown</span>
+                <div id="prob-{{ nutrient }}" style="display: none; margin-top: 0.35rem;">
+                  {% for cls_name, prob in data.probabilities.items() %}
+                  <div class="prob-row">
+                    <span>{{ cls_name }}</span>
+                    <span>{{ "%.1f"|format(prob) }}%</span>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width: {{ prob }}%;"></div>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <!-- Section 3: Chemical Constraint Layer (CCL) -->
+          <h2 class="section-heading" style="margin-top: 1.5rem;">3. pH-Related Availability Restriction</h2>
+          
+          {% if ccl.has_restriction %}
+          <div class="ccl-banner ccl-alert">
+            <div class="ccl-status-title">
+              ⚠️ pH-related availability restriction: <strong>YES</strong>
+            </div>
+            <div style="font-weight: 600; color: #7c2d12; margin-top: 0.5rem;">
+              Affected nutrient(s):
+            </div>
+            <ul class="ccl-affected-list">
+              {% for affected in ccl.affected_nutrients %}
+              <li><strong>{{ affected }}</strong></li>
+              {% endfor %}
+            </ul>
+            <p class="ccl-desc">
+              Chemical solubility and soil fixation boundaries reduce plant nutrient uptake regardless of total soil nutrient content.
+            </p>
+          </div>
+          {% else %}
+          <div class="ccl-banner ccl-ok">
+            <div class="ccl-status-title">
+              ✅ pH-related availability restriction: <strong>NO</strong>
+            </div>
+            <p class="ccl-desc">
+              Current soil pH (H₂O) of <strong>{{ "%.2f"|format(inputs.ph) }}</strong> is within the unrestricted bioavailability window for Nitrogen, Phosphorus, and Potassium.
+            </p>
+          </div>
+          {% endif %}
+
+          <!-- Neural Network vs CCL Comparison Table -->
+          <h3 style="font-size: 1.05rem; font-weight: 600; color: #1e293b; margin-top: 1.5rem; margin-bottom: 0.5rem;">
+            Neural Network vs. Chemical Constraint Layer Comparison
+          </h3>
+          <p class="info-text">
+            Demonstrates neural network diagnostic status alongside independent pH availability restrictions.
+          </p>
+
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th>Nutrient</th>
+                <th>Neural Network Status</th>
+                <th>pH-related Availability Restriction</th>
+                <th>Agronomic Interpretation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for nutrient in ['Nitrogen', 'Phosphorus', 'Potassium'] %}
+              {% set nn_st = results[nutrient].status %}
+              {% set is_restr = ccl.restrictions[nutrient] %}
+              <tr>
+                <td><strong>{{ nutrient }}</strong></td>
+                <td><span class="status-badge badge-{{ nn_st }}">{{ nn_st }}</span></td>
+                <td>
+                  {% if is_restr %}
+                  <span class="ccl-tag-yes">YES</span>
+                  {% else %}
+                  <span class="ccl-tag-no">NO</span>
+                  {% endif %}
+                </td>
+                <td style="font-size: 0.88rem; color: #475569;">
+                  {% if nn_st == 'SUFFICIENT' and is_restr %}
+                  ⚠️ Adequate reserves present in soil, but root uptake is restricted by pH conditions.
+                  {% elif nn_st == 'DEFICIENT' and is_restr %}
+                  ❌ Soil nutrient reserves are deficient and uptake is hindered by pH conditions.
+                  {% elif nn_st == 'DEFICIENT' and not is_restr %}
+                  ⚠️ Deficient soil reserves, but pH does not restrict root availability.
+                  {% elif nn_st == 'SUFFICIENT' and not is_restr %}
+                  ✅ Optimal: Sufficient nutrient reserves with unrestricted bioavailability.
+                  {% elif nn_st == 'HIGH' %}
+                  ℹ️ High nutrient concentration; monitor for potential runoff or imbalance.
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <!-- Mandatory Explanation Callout -->
+          <div class="mandatory-callout">
+            "Nutrient status is produced by the trained neural network. 
+             pH-related availability restriction is determined separately using the CCL pH rules."
+          </div>
+        </section>
+        {% endif %}
+      </main>
+    </div>
+  </div>
+
+  <script>
+    // Preset profile applicator
+    function applyPreset(n, p, k, ph, btnElem) {
+      document.getElementById('input_n').value = Number(n).toFixed(2);
+      document.getElementById('input_p').value = Number(p).toFixed(2);
+      document.getElementById('input_k').value = Number(k).toFixed(2);
+      document.getElementById('input_ph').value = Number(ph).toFixed(2);
+
+      // Highlight active button
+      document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+      if (btnElem) {
+        btnElem.classList.add('active');
+      }
+    }
+
+    // Toggle probability distribution details
+    function toggleProb(nutrient) {
+      const container = document.getElementById('prob-' + nutrient);
+      if (container.style.display === 'none') {
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+      }
+    }
+
+    // Auto-scroll to results on load if present
+    document.addEventListener("DOMContentLoaded", () => {
+      const res = document.getElementById('resultsSection');
+      if (res) {
+        res.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    });
+  </script>
+</body>
+</html>
